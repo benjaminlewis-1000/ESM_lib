@@ -41,6 +41,20 @@ int main(int argc, char** argv) {
  		}
  	}
  	
+ 	trackStruct T;
+ 	int posx = 0;
+ 	int posy = 0;
+ 	int sizx = 0;
+ 	int sizy = 0;
+ 	int miter = 3;
+ 	int mprec = 2;
+ 	
+	if (MallTrack (&T, &I, posx, posy, sizx, sizy, miter, mprec)){
+		printf ("Error!\n");
+		exit(1);
+	}else{
+		printf ("ESM Tracking structure ready\n");
+	}
  	
  	
  	SavePgm(filename, &I);
