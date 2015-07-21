@@ -24,7 +24,10 @@ extern "C"{
 	#include "ESMlibry.h"
 }
 
+#include "homographyHelper.h"
 #include "decompose.h"
+
+using namespace std;
 
 // #####   MACROS  -  LOCAL TO THIS SOURCE FILE   #############################
 
@@ -45,7 +48,7 @@ void DrawResult (int sx, int sy, float H[9], imageStruct I);
 
 int main (int argc, char **argv)
 {
-  unsigned int i, nbimages = 60;
+  unsigned int nbimages = 60;
   char filename[MAXFILENAME];
 
   // The tracking parameters
@@ -60,10 +63,10 @@ int main (int argc, char **argv)
 
   // The window position (upper left corner) 
   // The image coordinates start from (0,0)
-  int posx = 50, posy = 50;
+  int posx = 0, posy = 0;
 
   // The window size
-  int sizx = 540, sizy = 260;
+  int sizx = 640, sizy = 360;
 
   // The image read / acquired 
   imageStruct I; 
@@ -71,8 +74,12 @@ int main (int argc, char **argv)
   // The global tracking structure
   trackStruct T; 
   
+  std::string refIm = "./simulation/im000.pgm";
+  //char filename[40];
+  sprintf(filename, "%s", refIm.c_str() );
+  
   // Read the reference image
-  if (ReadPgm ("./simulation/im000.rotated.pgm", &I)){
+  if (ReadPgm (filename, &I)){
     printf("Can't find the /seq directory. Perhaps in wrong directory?\n");
     return (1);
   }else
@@ -85,31 +92,54 @@ int main (int argc, char **argv)
   if (MallTrack (&T, &I, posx, posy, sizx, sizy, miter, mprec))
     return (1);
   else
-    printf ("ESM Tracking structure ready\n");
-    
- 	printf("Value of trackstruct something is %d\n", T.miter);
   
   // Save the reference pattern
   sprintf (filename, "./res/patr.pgm");
   if (SavePgm (filename, GetPatr (&T)))
     return (1);
-  else
-    printf ("ESM Writing %s\n", filename);
+ 
 
-	T.homog[0] = 1;
+/*	T.homog[0] = 1;
 	T.homog[1] = 0;
-	T.homog[2] = -60.534;
+	T.homog[2] = -60.5;
 	T.homog[3] = 0;
 	T.homog[4] = 1;
-	T.homog[5] = 167.82;
+	T.homog[5] = 167.8;
 	T.homog[6] = 0;
 	T.homog[7] = 0;
 	T.homog[8] = 1;
+	
+	
+	*/
+	
+  std::vector<cv::Point2d> matched_kps_moved;
+  std::vector<cv::Point2d> matched_kps_keyframe;
+  
+  cv::Mat image1, image2;
+  
+  image1 = cv::imread(refIm);
+  sprintf(filename, "./simulation/im%03d.pgm", nbimages-1);
+  image2 = cv::imread(filename);
+  
+  matchImage(image2, image1, matched_kps_moved, matched_kps_keyframe, 40);
+  
+	cv::Mat moved_mat(matched_kps_moved);  // TODO Look here (??)
+	cv::Mat keyframe_mat(matched_kps_keyframe);
 
+	cv::Mat H;
+	H = cv::findHomography( moved_mat, keyframe_mat, CV_RANSAC);
+	
+	
+	for (int i = 0; i < 3; i++){
+		for (int j = 0; j < 3; j++){
+			T.homog[i*3 + j] = H.at<double>(i, j);
+		}
+	}
+	
 
-  for (i = nbimages - 1; i >= 0; i--) {    
- // for (i = 0; i < nbimages; i++){ 
-    sprintf (filename, "./simulation/im%03d.rotated.pgm", i);
+ for (int i = nbimages - 1; i >= 0; i--) { 
+//  for (unsigned int i = 0; i < nbimages; i++){ 
+    sprintf (filename, "./simulation/im%03d.pgm", i);
     if (ReadPgm (filename, &I)) 
       return (1);
     else
@@ -146,10 +176,30 @@ int main (int argc, char **argv)
   
 	float res = GetZNCC(&T);
 	printf("ZNCC is %f\n", res);
+	
   }
+	std::cout << H << std::endl;
   
-  printf("Done with that half.\n");
+ 
+  std::vector<cv::Point2d> matched_kps_moved2;
+  std::vector<cv::Point2d> matched_kps_keyframe2;
   
+  cv::Mat image12, image22;
+  
+  image12 = cv::imread(refIm);
+  sprintf(filename, "./simulation/im%03d.rotated.pgm", nbimages-1);
+  image22 = cv::imread(filename);
+  
+  matchImage(image12, image22, matched_kps_moved2, matched_kps_keyframe2, 40);
+  
+	cv::Mat moved_mat2(matched_kps_moved2);  // TODO Look here (??)
+	cv::Mat keyframe_mat2(matched_kps_keyframe2);
+
+	cv::Mat H2;
+	H2 = cv::findHomography( moved_mat2, keyframe_mat2, CV_RANSAC);
+	
+	std::cout << H2 << std::endl;
+
   /****************************************/
 	 /* Eigen::Matrix3d K;
 	  K << 170, 0, 320, 0, 170, 180, 0, 0, 1;
@@ -161,8 +211,8 @@ int main (int argc, char **argv)
 	  */
 	  
   /****************************************/
-/*  
-  for (i = nbimages - 1; i >= 0; i--) {    
+ 
+/*  for (int i = nbimages - 1; i >= 0; i--) {    
  // for (i = 0; i < nbimages; i++){ 
     sprintf (filename, "./simulation/im%03d.rotated.pgm", i);
     if (ReadPgm (filename, &I)) 
